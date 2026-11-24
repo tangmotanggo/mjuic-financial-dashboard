@@ -1,0 +1,899 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financial Dashboard - วิทยาลัยนานาชาติ</title>
+  <!-- Google Fonts: Prompt -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Prompt:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- SheetJS (xlsx) สำหรับอ่านไฟล์ Excel ใหม่แบบ Dynamic -->
+  <script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"></script>
+  <style>
+    body {
+      font-family: 'Prompt', sans-serif;
+      background-color: #f8fafc;
+    }
+    .card-shadow {
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+    }
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar { width: 6px; height: 6px; }
+    ::-webkit-scrollbar-track { background: #f1f5f9; }
+    ::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 9999px; }
+    ::-webkit-scrollbar-thumb:hover { background: #94a3b8; }
+  </style>
+</head>
+<body class="text-slate-800 antialiased">
+
+  <!-- Top Navigation / Header -->
+  <header class="bg-gradient-to-r from-indigo-600 via-blue-600 to-cyan-600 text-white shadow-lg">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div class="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+        <div>
+          <div class="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-white/15 backdrop-blur-sm text-xs font-medium mb-2">
+            <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+            <span id="reportPeriodBadge">ระหว่างวันที่ 1 ตุลาคม 2569 - 31 ตุลาคม 2569 (1 เดือน)</span>
+          </div>
+          <h1 id="reportTitle" class="text-2xl sm:text-3xl font-bold tracking-tight">
+            Dashboard รายรับ-รายจ่าย งบประมาณเงินรายได้
+          </h1>
+          <p id="reportSubtitle" class="text-blue-100 text-sm mt-1">
+            วิทยาลัยนานาชาติ • ปีงบประมาณ 2570
+          </p>
+        </div>
+
+        <!-- Dynamic Excel Upload Button -->
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <label for="excelUpload" class="cursor-pointer inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-white text-indigo-700 hover:bg-indigo-50 font-medium text-sm rounded-xl shadow-sm transition duration-150">
+            <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12"></path>
+            </svg>
+            <span>อัปโหลดไฟล์ Excel ใหม่ (.xlsx)</span>
+            <input id="excelUpload" type="file" accept=".xlsx, .xls" class="hidden" />
+          </label>
+          <button onclick="resetFilters()" class="inline-flex items-center justify-center gap-1.5 px-4 py-2.5 bg-indigo-500/40 hover:bg-indigo-500/60 text-white border border-white/25 font-medium text-sm rounded-xl transition duration-150">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+            </svg>
+            <span>ล้างตัวกรอง</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-6">
+
+    <!-- Filter Control Panel -->
+    <section class="bg-white rounded-2xl p-5 card-shadow border border-slate-100">
+      <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-4">
+        <h2 class="text-sm font-semibold text-slate-700 flex items-center gap-2">
+          <svg class="w-4 h-4 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 011 1v2.586a1 1 0 01-.293.707l-6.414 6.414a1 1 0 00-.293.707V17l-4 4v-6.586a1 1 0 00-.293-.707L3.293 7.293A1 1 0 013 6.586V4z"></path>
+          </svg>
+          ตัวกรองข้อมูลแบบ Interactive (คลิกเลือกเพื่ออัปเดตตัวเลขและกราฟทันที)
+        </h2>
+        <span id="fileStatusText" class="text-xs text-slate-400">แหล่งข้อมูล: ว.นานาชาติ-31 ตค 69_2.xlsx</span>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+        <!-- Filter 1: ประเภทรายรับ -->
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1.5">ประเภทรายรับ</label>
+          <select id="revenueFilter" onchange="applyFilters()" class="w-full rounded-xl border-slate-200 bg-slate-50 text-sm text-slate-700 py-2.5 px-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 border transition">
+            <option value="ALL">ทั้งหมด (ทุกรายการรายรับ)</option>
+          </select>
+        </div>
+
+        <!-- Filter 2: หมวดหมู่รายจ่าย -->
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1.5">หมวดหมู่รายจ่าย</label>
+          <select id="expenseCategoryFilter" onchange="onCategoryChange()" class="w-full rounded-xl border-slate-200 bg-slate-50 text-sm text-slate-700 py-2.5 px-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 border transition">
+            <option value="ALL">ทั้งหมด (ทุกหมวดหมู่รายจ่าย)</option>
+          </select>
+        </div>
+
+        <!-- Filter 3: รายการจ่ายเฉพาะเจาะจง -->
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1.5">รายการรายจ่ายย่อย</label>
+          <select id="expenseItemFilter" onchange="applyFilters()" class="w-full rounded-xl border-slate-200 bg-slate-50 text-sm text-slate-700 py-2.5 px-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 border transition">
+            <option value="ALL">ทั้งหมดในหมวดที่เลือก</option>
+          </select>
+        </div>
+
+        <!-- Filter 4: สถานะการเบิกจ่าย -->
+        <div>
+          <label class="block text-xs font-medium text-slate-500 mb-1.5">สถานะรายการ (รับ/จ่ายจริง)</label>
+          <select id="activityFilter" onchange="applyFilters()" class="w-full rounded-xl border-slate-200 bg-slate-50 text-sm text-slate-700 py-2.5 px-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 border transition">
+            <option value="ALL">แสดงทั้งหมด (รวมรายการที่ยังเป็น 0)</option>
+            <option value="ACTIVE_ONLY">เฉพาะรายการที่มีการรับ-จ่ายจริง (> 0 บาท)</option>
+            <option value="ZERO_ONLY">เฉพาะรายการที่ยังไม่มียอดเคลื่อนไหว (= 0 บาท)</option>
+          </select>
+        </div>
+      </div>
+    </section>
+
+    <!-- KPI Summary Cards -->
+    <section class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+      <!-- KPI 1: งบประมาณที่ตั้งไว้ -->
+      <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-100 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">งบประมาณตั้งรับ / ตั้งจ่าย</p>
+            <h3 id="kpiBudget" class="text-2xl font-bold text-slate-800 mt-2">฿6,555,120</h3>
+          </div>
+          <div class="p-2.5 bg-indigo-50 text-indigo-600 rounded-xl">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between text-xs text-slate-500">
+          <span id="kpiBudgetSub">งบรับ: ฿6,555,120 | งบจ่าย: ฿6,555,120</span>
+        </div>
+      </div>
+
+      <!-- KPI 2: รายรับจริง -->
+      <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-100 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">รายรับจริงสะสม</p>
+            <h3 id="kpiActualRev" class="text-2xl font-bold text-emerald-600 mt-2">฿156,200.76</h3>
+          </div>
+          <div class="p-2.5 bg-emerald-50 text-emerald-600 rounded-xl">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-500">คิดเป็นร้อยละของงบประมาณรับ</span>
+            <span id="kpiRevPct" class="font-semibold text-emerald-600">2.38%</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-1.5">
+            <div id="kpiRevBar" class="bg-emerald-500 h-1.5 rounded-full transition-all duration-500" style="width: 2.38%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 3: รายจ่ายจริง -->
+      <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-100 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">รายจ่ายจริงสะสม</p>
+            <h3 id="kpiActualExp" class="text-2xl font-bold text-rose-600 mt-2">฿175,765</h3>
+          </div>
+          <div class="p-2.5 bg-rose-50 text-rose-600 rounded-xl">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4">
+          <div class="flex justify-between text-xs mb-1">
+            <span class="text-slate-500">คิดเป็นร้อยละของงบประมาณจ่าย</span>
+            <span id="kpiExpPct" class="font-semibold text-rose-600">2.68%</span>
+          </div>
+          <div class="w-full bg-slate-100 rounded-full h-1.5">
+            <div id="kpiExpBar" class="bg-rose-500 h-1.5 rounded-full transition-all duration-500" style="width: 2.68%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPI 4: ดุลรายรับ-รายจ่ายจริง -->
+      <div class="bg-white rounded-2xl p-5 card-shadow border border-slate-100 relative overflow-hidden">
+        <div class="flex justify-between items-start">
+          <div>
+            <p class="text-xs font-medium text-slate-500 uppercase tracking-wider">รายรับสูง/(ต่ำ)กว่ารายจ่าย</p>
+            <h3 id="kpiNetBalance" class="text-2xl font-bold text-amber-600 mt-2">-฿19,564.24</h3>
+          </div>
+          <div id="kpiNetIconBox" class="p-2.5 bg-amber-50 text-amber-600 rounded-xl">
+            <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6"></path>
+            </svg>
+          </div>
+        </div>
+        <div class="mt-4 flex items-center justify-between text-xs">
+          <span id="kpiNetStatus" class="px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium">รายจ่ายสูงกว่ารายรับ</span>
+          <span id="kpiRemainingBudget" class="text-slate-400">งบจ่ายคงเหลือ: 97.32%</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Note Banner from Sheet 1 -->
+    <div id="noteBanner" class="bg-amber-50/90 border border-amber-200 rounded-2xl p-4 flex items-start gap-3">
+      <svg class="w-5 h-5 text-amber-600 shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+      </svg>
+      <div class="text-xs sm:text-sm text-amber-900 leading-relaxed">
+        <span class="font-semibold">หมายเหตุประกอบงบการเงิน:</span>
+        <span id="noteContent">เดือนตุลาคม 2569 ยังไม่มีการชำระค่าธรรมเนียมการศึกษาของนักศึกษาระดับบัณฑิตศึกษา เนื่องจากเป็นช่วงสอบปลายภาคเรียนที่ 1/2569 และเป็นช่วงของการดำเนินการส่งโครงร่างวิทยานิพนธ์และดุษฎีนิพนธ์ของนักศึกษา การชำระค่าธรรมเนียมการศึกษาตามกำหนดการจะเริ่มชำระในวันที่ 23-29 พฤศจิกายน 2569</span>
+      </div>
+    </div>
+
+    <!-- Charts Row 1 -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Chart 1: สัดส่วนรายรับจริง (Donut) -->
+      <div class="lg:col-span-5 bg-white rounded-2xl p-6 card-shadow border border-slate-100 flex flex-col">
+        <div class="mb-4">
+          <h3 class="text-base font-bold text-slate-800">สัดส่วนแหล่งที่มาของรายรับจริง</h3>
+          <p class="text-xs text-slate-500">เปรียบเทียบสัดส่วนรายรับที่จัดเก็บได้จริงตามหมวดรายได้</p>
+        </div>
+        <div class="relative flex-1 min-h-[260px] flex items-center justify-center">
+          <canvas id="revenueDonutChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 2: เปรียบเทียบงบประมาณ vs รายรับจริง (Grouped Bar) -->
+      <div class="lg:col-span-7 bg-white rounded-2xl p-6 card-shadow border border-slate-100 flex flex-col">
+        <div class="mb-4">
+          <h3 class="text-base font-bold text-slate-800">เปรียบเทียบประมาณการรายรับ vs รายรับจริง</h3>
+          <p class="text-xs text-slate-500">แสดงเป้าหมายตามเล่มงบประมาณเทียบกับยอดจัดเก็บได้จริง (บาท)</p>
+        </div>
+        <div class="relative flex-1 min-h-[260px]">
+          <canvas id="revenueBarChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Charts Row 2 -->
+    <section class="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <!-- Chart 3: สัดส่วนรายจ่ายแยกตามหมวดหมู่ (Donut) -->
+      <div class="lg:col-span-5 bg-white rounded-2xl p-6 card-shadow border border-slate-100 flex flex-col">
+        <div class="mb-4">
+          <h3 class="text-base font-bold text-slate-800">โครงสร้างงบรายจ่ายแยกตามหมวดหมู่</h3>
+          <p class="text-xs text-slate-500">สัดส่วนยอดเบิกจ่ายจริง (หรือยอดตั้งงบประมาณหากยังไม่เบิกจ่าย)</p>
+        </div>
+        <div class="relative flex-1 min-h-[280px] flex items-center justify-center">
+          <canvas id="expenseCategoryChart"></canvas>
+        </div>
+      </div>
+
+      <!-- Chart 4: Top รายการเบิกจ่ายจริงสูงสุด (Horizontal Bar) -->
+      <div class="lg:col-span-7 bg-white rounded-2xl p-6 card-shadow border border-slate-100 flex flex-col">
+        <div class="mb-4">
+          <h3 class="text-base font-bold text-slate-800">รายการรายจ่ายที่มีการเบิกจ่ายจริงสูงสุด (Top Expense Items)</h3>
+          <p class="text-xs text-slate-500">เปรียบเทียบยอดจ่ายจริงกับงบประมาณที่ตั้งไว้รายรายการ</p>
+        </div>
+        <div class="relative flex-1 min-h-[280px]">
+          <canvas id="expenseTopBarChart"></canvas>
+        </div>
+      </div>
+    </section>
+
+    <!-- Detailed Data Tables with Tabs & Sorting (มาก -> น้อย) -->
+    <section class="bg-white rounded-2xl card-shadow border border-slate-100 overflow-hidden">
+      <div class="border-b border-slate-100 px-6 py-4 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+        <div class="flex items-center gap-2 bg-slate-100 p-1 rounded-xl w-fit">
+          <button id="tabExpBtn" onclick="switchTab('expense')" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white text-indigo-600 shadow-sm transition">
+            ตารางรายละเอียดรายจ่าย (<span id="expCountBadge">40</span>)
+          </button>
+          <button id="tabRevBtn" onclick="switchTab('revenue')" class="px-4 py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 transition">
+            ตารางรายละเอียดรายรับ (<span id="revCountBadge">7</span>)
+          </button>
+        </div>
+
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
+          <!-- ตัวเลือกเกณฑ์การเรียงลำดับจากมากไปน้อย -->
+          <div class="flex items-center gap-2">
+            <label for="sortOrderSelect" class="text-xs font-medium text-slate-500 whitespace-nowrap">เรียงลำดับ (มาก → น้อย):</label>
+            <select id="sortOrderSelect" onchange="applyFilters()" class="rounded-xl border-slate-200 bg-slate-50 text-xs sm:text-sm text-slate-700 py-2 px-3 focus:ring-2 focus:ring-indigo-500 border transition">
+              <option value="budget_desc">งบประมาณตั้งไว้ (มาก → น้อย)</option>
+              <option value="actual_desc">ยอดรับ/จ่ายจริง (มาก → น้อย)</option>
+              <option value="remaining_desc">ยอดคงเหลือ (มาก → น้อย)</option>
+            </select>
+          </div>
+
+          <div class="relative">
+            <input type="text" id="searchInput" onkeyup="applyFilters()" placeholder="ค้นหาชื่อรายการ / บุคลากร / เลขที่อัตรา..." class="w-full sm:w-64 pl-9 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-xs sm:text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+            <svg class="w-4 h-4 text-slate-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path>
+            </svg>
+          </div>
+        </div>
+      </div>
+
+      <!-- Expense Table -->
+      <div id="expenseTableContainer" class="overflow-x-auto max-h-[480px]">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-slate-50 sticky top-0 z-10 text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
+            <tr>
+              <th class="py-3.5 px-6">รายการรายจ่าย</th>
+              <th class="py-3.5 px-4">หมวดหมู่</th>
+              <th class="py-3.5 px-4 text-right">งบประมาณตั้งจ่าย ↓</th>
+              <th class="py-3.5 px-4 text-right">จ่ายจริง ↓</th>
+              <th class="py-3.5 px-4 text-right">คงเหลือ</th>
+              <th class="py-3.5 px-6 text-right">% เบิกจ่าย</th>
+            </tr>
+          </thead>
+          <tbody id="expenseTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+        </table>
+      </div>
+
+      <!-- Revenue Table -->
+      <div id="revenueTableContainer" class="overflow-x-auto max-h-[480px] hidden">
+        <table class="w-full text-left border-collapse">
+          <thead class="bg-slate-50 sticky top-0 z-10 text-xs font-semibold text-slate-500 uppercase border-b border-slate-200">
+            <tr>
+              <th class="py-3.5 px-6">รายการรายรับ</th>
+              <th class="py-3.5 px-4 text-right">งบประมาณรายรับ ↓</th>
+              <th class="py-3.5 px-4 text-right">รายรับจริง ↓</th>
+              <th class="py-3.5 px-4 text-right">ส่วนต่างคงเหลือ</th>
+              <th class="py-3.5 px-6 text-right">% จัดเก็บจริง</th>
+            </tr>
+          </thead>
+          <tbody id="revenueTableBody" class="divide-y divide-slate-100 text-sm"></tbody>
+        </table>
+      </div>
+    </section>
+
+  </main>
+
+  <script>
+    // =========================================================================
+    // 1. EMBEDDED DATASET (อัปเดตตามไฟล์ ว.นานาชาติ-31 ตค 69_2.xlsx)
+    // =========================================================================
+    let appState = {
+      meta: {
+        org: "วิทยาลัยนานาชาติ",
+        title: "Dashboard รายรับ-รายจ่าย งบประมาณเงินรายได้",
+        period: "ระหว่างวันที่ 1 ตุลาคม 2569 - 31 ตุลาคม 2569 (1 เดือน)",
+        fiscalYear: "ปีงบประมาณ 2570",
+        note: "เดือนตุลาคม 2569 ยังไม่มีการชำระค่าธรรมเนียมการศึกษาของนักศึกษาระดับบัณฑิตศึกษา เนื่องจากเป็นช่วงสอบปลายภาคเรียนที่ 1/2569 และเป็นช่วงของการดำเนินการส่งโครงร่างวิทยานิพนธ์และดุษฎีนิพนธ์ของนักศึกษา การชำระค่าธรรมเนียมการศึกษาตามกำหนดการจะเริ่มชำระในวันที่ 23-29 พฤศจิกายน 2569"
+      },
+      revenues: [
+        { item: "410201001 รายได้จากการจัดการศึกษา", budget: 4588720.0, actual: 28040.76 },
+        { item: "410201002 รายได้เงินผลประโยชน์", budget: 61200.0, actual: 16380.0 },
+        { item: "410201010 รายได้เงินอุดหนุนจากแหล่งเงินทุนภายนอก", budget: 0.0, actual: 0.0 },
+        { item: "410201011 รายได้จากการฝึกอบรม", budget: 1825200.0, actual: 111780.0 },
+        { item: "410201012 เงินบริจาค", budget: 80000.0, actual: 0.0 },
+        { item: "410201009 รายได้จากการจําหน่ายสินทรัพย์", budget: 0.0, actual: 0.0 },
+        { item: "รับโอนจากหน่วยงานอื่น", budget: 0.0, actual: 0.0 }
+      ],
+      expenses: [
+        { item: "ค่าจ้างพนักงานส่วนงาน อาจารย์ 1 อัตรา เลขที่ 189-อัตราว่าง", budget: 304920.0, actual: 0.0 },
+        { item: "ค่าจ้างพนักงานส่วนงาน อาจารย์ 2 อัตรา เลขที่ 173,192-อัตราว่าง", budget: 840000.0, actual: 0.0 },
+        { item: "เงินสมทบประกันสังคม-อัตรา เลขที่ 189,173,192", budget: 31500.0, actual: 0.0 },
+        { item: "ค่าตอบแทนผู้บริหารที่มีวาระ-รองคณบดี-อ.ดร.สุธีรา สิทธิกุล", budget: 67200.0, actual: 0.0 },
+        { item: "เงินประจำตำแหน่งผู้บริหารที่มีวาระ-รองคณบดี-อ.ดร.สุธีรา สิทธิกุล", budget: 67200.0, actual: 0.0 },
+        { item: "เงินสมนาคุณผู้ช่วยคณบดี-Dr. Prakash Bhuyar", budget: 42000.0, actual: 0.0 },
+        { item: "ค่าจ้างพนักงานมหาวิทยาลัย อาจารย์ 1 อัตรา เลขที่ 1173-รศ.ดร.ศิริพร กิรติการกุล", budget: 602660.0, actual: 48290.0 },
+        { item: "ค่าจ้างพนักงานส่วนงาน อาจารย์ 1 อัตรา เลขที่ 172-Miss Jing-Wun Wong", budget: 254160.0, actual: 21180.0 },
+        { item: "ค่าตอบแทนรายเดือน อาจารย์ 1 อัตรา เลขที่ 172-Miss Jing-Wun Wong", budget: 45840.0, actual: 3820.0 },
+        { item: "เงินสมทบประกันสังคม-อัตรา เลขที่ 172", budget: 10500.0, actual: 875.0 },
+        { item: "ค่าจ้างพนักงานส่วนงาน นักวิเคราะห์นโยบายและแผน 1 อัตรา เลขที่ 063-น.ส.เกวลิน นันปินตา", budget: 217800.0, actual: 18150.0 },
+        { item: "ค่าจ้างพนักงานส่วนงาน นักวิชาการศึกษา 1 อัตรา เลขที่ 197-น.ส.อนุธิดา ปูรณะพงศ์", budget: 217800.0, actual: 18150.0 },
+        { item: "ค่าจ้างพนักงานส่วนงาน นักวิเทศสัมพันธ์ 1 อัตรา เลขที่ 160-อัตราว่าง", budget: 217800.0, actual: 0.0 },
+        { item: "เงินสมทบประกันสังคม-อัตรา เลขที่ 063,197,160", budget: 31500.0, actual: 1750.0 },
+        { item: "งบสำรองส่วนงาน", budget: 1920.0, actual: 0.0 },
+        { item: "โครงการตามแผนปฏิบัติการมหาวิทยาลัย-โครงการด้านการวิจัยและการพัฒนานวัตกรรม", budget: 100000.0, actual: 0.0 },
+        { item: "โครงการตามแผนปฏิบัติการมหาวิทยาลัย-โครงการบริการวิชาการ", budget: 250000.0, actual: 0.0 },
+        { item: "ค่าใช้จ่ายในการสัมมนาและฝึกอบรม-พัฒนาบุคลากรสายวิชาการ", budget: 120000.0, actual: 0.0 },
+        { item: "โครงการตามแผนปฏิบัติการมหาวิทยาลัย- โครงการด้านการเรียนการสอน/ประกันคุณภาพ/ปรับปรุง-วิพากษ์หลักสูตร", budget: 220000.0, actual: 0.0 },
+        { item: "โครงการตามแผนปฏิบัติการมหาวิทยาลัย-โครงการ ECP", budget: 147950.0, actual: 0.0 },
+        { item: "ค่าตอบแทนอื่นๆ (การเรียนการสอน)", budget: 32000.0, actual: 0.0 },
+        { item: "ค่าตอบแทนผู้ตรวจและหรือผู้ควบคุมคณะกรรมการสอบดุษฎีนิพนธ์ วิทยานิพนธ์ ปัญหาพิเศษ การค้นคว้าอิสระ หรือสารนิพนธ์", budget: 100000.0, actual: 0.0 },
+        { item: "เงินค่าสอนพิเศษ", budget: 50000.0, actual: 0.0 },
+        { item: "ค่าจ้างเหมาบริการ(การเรียนการสอน)-น.ส.การะเกด ใจสดสวยสวัสดิ์", budget: 180000.0, actual: 15000.0 },
+        { item: "ค่าเบี้ยประชุม (กรรมการประจำวิทยาลัย)", budget: 24600.0, actual: 1450.0 },
+        { item: "ค่าใช้สอยอื่นๆ (ส่วนกลาง)", budget: 26500.0, actual: 0.0 },
+        { item: "ค่าจ้างเหมาบริการ (ส่วนกลาง) (น.ส.ณัจฉรียา ชัยประภา, นายกฤษกร ใจสาม,น.ส.พรรัมภา ขวัญยืน)", budget: 650000.0, actual: 45000.0 },
+        { item: "ค่าใช้จ่ายในการเดินทาง (ภายในประเทศ)", budget: 100000.0, actual: 0.0 },
+        { item: "ค่าใช้จ่ายในการประชุมกรรมการประจำวิทยาลัย", budget: 7200.0, actual: 400.0 },
+        { item: "ค่าเบี้ยประกันภัย,ค่าภาษีรถประจำปี,ค่าตรวจสภาพรถ", budget: 2000.0, actual: 0.0 },
+        { item: "ค่าเลี้ยงรับรอง (ส่วนกลาง)", budget: 30000.0, actual: 0.0 },
+        { item: "ค่าวัสดุ (ส่วนกลาง)", budget: 310000.0, actual: 0.0 },
+        { item: "โครงการตามแผนปฏิบัติการมหาวิทยาลัย-โครงการด้านแผนและคำรับรองประจำปี,ศึกษาดูงานประจำปี,ทำบุบำรุงศิลปวัฒนธรรม", budget: 250000.0, actual: 0.0 },
+        { item: "ค่าสาธารณูปโภค ค่าบริการโทรศัพท์เคลื่อนที่", budget: 14000.0, actual: 0.0 },
+        { item: "ค่าสาธารณูปโภค ค่าไปรษณียภัณฑ์", budget: 2000.0, actual: 0.0 },
+        { item: "โครงการตามแผนปฏิบัติการมหาวิทยาลัย (มิติที่ 3) (เดินทางไปปฏิบัติงานต่างประเทศ)", budget: 300000.0, actual: 0.0 },
+        { item: "ค่าใช้จ่ายในการสัมมนาและฝึกอบรม (พัฒนาบุคลากร-สายสนับสนุน)", budget: 56000.0, actual: 0.0 },
+        { item: "งบสำรองส่วนงาน", budget: 281910.0, actual: 0.0 },
+        { item: "ค่าซ่อมแซมบำรุงรักษาทรัพย์สิน", budget: 327760.0, actual: 0.0 },
+        { item: "ค่ารับรองเหมาจ่าย (คณบดี,รองคณบดี)", budget: 20400.0, actual: 1700.0 }
+      ]
+    };
+
+    // จัดหมวดหมู่รายจ่ายอัตโนมัติ (รองรับทั้งข้อมูลเดิมและแถวข้อมูลใหม่ในอนาคต)
+    function categorizeExpense(name) {
+      if (name.includes("ค่าจ้างพนักงาน") || name.includes("ประกันสังคม") || name.includes("เงินประจำตำแหน่ง") || name.includes("ค่าตอบแทนผู้บริหาร") || name.includes("เงินสมนาคุณผู้ช่วยคณบดี") || name.includes("ค่าตอบแทนรายเดือน")) {
+        return "1. งบบุคลากรและเงินสมทบ";
+      }
+      if (name.includes("ค่าจ้างเหมาบริการ") || name.includes("ค่าสอนพิเศษ") || name.includes("ค่าตอบแทน") || name.includes("ค่าเบี้ยประชุม") || name.includes("ค่ารับรองเหมาจ่าย")) {
+        return "2. ค่าจ้างเหมาบริการและค่าตอบแทน";
+      }
+      if (name.includes("โครงการตามแผนปฏิบัติการ") || name.includes("สัมมนาและฝึกอบรม")) {
+        return "3. โครงการและพัฒนาบุคลากร";
+      }
+      return "4. งบดำเนินงาน วัสดุ และงบสำรอง";
+    }
+
+    function enrichExpenses() {
+      appState.expenses = appState.expenses.map((e, idx) => ({
+        ...e,
+        id: idx,
+        category: categorizeExpense(e.item)
+      }));
+    }
+
+    // ฟังก์ชันเรียงลำดับข้อมูลจากมากไปน้อย (Descending)
+    function sortDescending(list, sortMode) {
+      return [...list].sort((a, b) => {
+        if (sortMode === "actual_desc") {
+          return (b.actual - a.actual) || (b.budget - a.budget);
+        }
+        if (sortMode === "remaining_desc") {
+          const remA = a.budget - a.actual;
+          const remB = b.budget - b.actual;
+          return (remB - remA) || (b.budget - a.budget);
+        }
+        // ค่าเริ่มต้น: เรียงตามงบประมาณตั้งไว้จากมากไปน้อย แล้วตามด้วยยอดจริงจากมากไปน้อย
+        return (b.budget - a.budget) || (b.actual - a.actual);
+      });
+    }
+
+    // =========================================================================
+    // 2. INITIALIZE CHARTS
+    // =========================================================================
+    let charts = {};
+    Chart.defaults.font.family = "'Prompt', sans-serif";
+    Chart.defaults.color = "#64748b";
+
+    const palette = [
+      "#4f46e5", "#10b981", "#f59e0b", "#ec4899", "#06b6d4",
+      "#8b5cf6", "#f43f5e", "#14b8a6", "#6366f1", "#84cc16"
+    ];
+
+    function initCharts() {
+      // 1. Revenue Donut
+      charts.revDonut = new Chart(document.getElementById("revenueDonutChart"), {
+        type: "doughnut",
+        data: { labels: [], datasets: [{ data: [], backgroundColor: palette, borderWidth: 2, borderColor: "#ffffff" }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: "65%",
+          plugins: {
+            legend: { position: "bottom", labels: { boxWidth: 12, padding: 14, font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const val = ctx.raw || 0;
+                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                  const pct = total > 0 ? ((val / total) * 100).toFixed(2) : 0;
+                  return ` ฿${Number(val).toLocaleString("th-TH", { maximumFractionDigits: 2 })} (${pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 2. Revenue Grouped Bar
+      charts.revBar = new Chart(document.getElementById("revenueBarChart"), {
+        type: "bar",
+        data: {
+          labels: [],
+          datasets: [
+            { label: "งบประมาณรายรับ", data: [], backgroundColor: "#cbd5e1", borderRadius: 6 },
+            { label: "รายรับจริง", data: [], backgroundColor: "#10b981", borderRadius: 6 }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "top", labels: { boxWidth: 12, font: { size: 11 } } },
+            tooltip: {
+              callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ฿${Number(ctx.raw).toLocaleString("th-TH", { maximumFractionDigits: 2 })}` }
+            }
+          },
+          scales: {
+            y: { beginAtZero: true, grid: { color: "#f1f5f9" }, ticks: { callback: v => "฿" + (v >= 1000000 ? (v/1000000).toFixed(1) + "M" : v.toLocaleString()) } },
+            x: { grid: { display: false }, ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+
+      // 3. Expense Category Donut
+      charts.expCatDonut = new Chart(document.getElementById("expenseCategoryChart"), {
+        type: "doughnut",
+        data: { labels: [], datasets: [{ data: [], backgroundColor: ["#6366f1", "#f43f5e", "#f59e0b", "#06b6d4"], borderWidth: 2, borderColor: "#ffffff" }] },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          cutout: "62%",
+          plugins: {
+            legend: { position: "bottom", labels: { boxWidth: 12, padding: 12, font: { size: 11 } } },
+            tooltip: {
+              callbacks: {
+                label: (ctx) => {
+                  const val = ctx.raw || 0;
+                  const total = ctx.dataset.data.reduce((a, b) => a + b, 0);
+                  const pct = total > 0 ? ((val / total) * 100).toFixed(2) : 0;
+                  return ` ฿${Number(val).toLocaleString("th-TH", { maximumFractionDigits: 2 })} (${pct}%)`;
+                }
+              }
+            }
+          }
+        }
+      });
+
+      // 4. Top Expense Horizontal Bar
+      charts.expTopBar = new Chart(document.getElementById("expenseTopBarChart"), {
+        type: "bar",
+        data: {
+          labels: [],
+          datasets: [
+            { label: "จ่ายจริง", data: [], backgroundColor: "#f43f5e", borderRadius: 5 },
+            { label: "งบประมาณที่ตั้งไว้", data: [], backgroundColor: "#e2e8f0", borderRadius: 5 }
+          ]
+        },
+        options: {
+          indexAxis: "y",
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: {
+            legend: { position: "top", labels: { boxWidth: 12, font: { size: 11 } } },
+            tooltip: {
+              callbacks: { label: (ctx) => ` ${ctx.dataset.label}: ฿${Number(ctx.raw).toLocaleString("th-TH", { maximumFractionDigits: 2 })}` }
+            }
+          },
+          scales: {
+            x: { beginAtZero: true, grid: { color: "#f1f5f9" }, ticks: { callback: v => "฿" + v.toLocaleString() } },
+            y: { grid: { display: false }, ticks: { font: { size: 10 } } }
+          }
+        }
+      });
+    }
+
+    // =========================================================================
+    // 3. POPULATE FILTERS & FILTERING LOGIC
+    // =========================================================================
+    function populateFilterDropdowns() {
+      const revSelect = document.getElementById("revenueFilter");
+      revSelect.innerHTML = `<option value="ALL">ทั้งหมด (ทุกรายการรายรับ)</option>`;
+      appState.revenues.forEach((r, i) => {
+        revSelect.innerHTML += `<option value="${i}">${r.item}</option>`;
+      });
+
+      const catSelect = document.getElementById("expenseCategoryFilter");
+      const categories = [...new Set(appState.expenses.map(e => e.category))].sort();
+      catSelect.innerHTML = `<option value="ALL">ทั้งหมด (ทุกหมวดหมู่รายจ่าย)</option>`;
+      categories.forEach(c => {
+        catSelect.innerHTML += `<option value="${c}">${c}</option>`;
+      });
+
+      populateExpenseItemDropdown();
+    }
+
+    function populateExpenseItemDropdown() {
+      const selectedCat = document.getElementById("expenseCategoryFilter").value;
+      const itemSelect = document.getElementById("expenseItemFilter");
+      itemSelect.innerHTML = `<option value="ALL">ทั้งหมดในหมวดที่เลือก</option>`;
+      const filtered = selectedCat === "ALL"
+        ? appState.expenses
+        : appState.expenses.filter(e => e.category === selectedCat);
+
+      filtered.forEach(e => {
+        const shortName = e.item.length > 55 ? e.item.substring(0, 55) + "..." : e.item;
+        itemSelect.innerHTML += `<option value="${e.id}">${shortName}</option>`;
+      });
+    }
+
+    function onCategoryChange() {
+      populateExpenseItemDropdown();
+      applyFilters();
+    }
+
+    function resetFilters() {
+      document.getElementById("revenueFilter").value = "ALL";
+      document.getElementById("expenseCategoryFilter").value = "ALL";
+      populateExpenseItemDropdown();
+      document.getElementById("expenseItemFilter").value = "ALL";
+      document.getElementById("activityFilter").value = "ALL";
+      document.getElementById("sortOrderSelect").value = "budget_desc";
+      document.getElementById("searchInput").value = "";
+      applyFilters();
+    }
+
+    function applyFilters() {
+      const revIdx = document.getElementById("revenueFilter").value;
+      const expCat = document.getElementById("expenseCategoryFilter").value;
+      const expItemId = document.getElementById("expenseItemFilter").value;
+      const activity = document.getElementById("activityFilter").value;
+      const sortMode = document.getElementById("sortOrderSelect").value;
+      const keyword = document.getElementById("searchInput").value.trim().toLowerCase();
+
+      // Filter & Sort Revenues (มาก -> น้อย)
+      let filteredRevs = appState.revenues.filter((r, idx) => {
+        if (revIdx !== "ALL" && String(idx) !== revIdx) return false;
+        if (activity === "ACTIVE_ONLY" && r.actual <= 0) return false;
+        if (activity === "ZERO_ONLY" && r.actual > 0) return false;
+        if (keyword && !r.item.toLowerCase().includes(keyword)) return false;
+        return true;
+      });
+      filteredRevs = sortDescending(filteredRevs, sortMode);
+
+      // Filter & Sort Expenses (มาก -> น้อย)
+      let filteredExps = appState.expenses.filter(e => {
+        if (expCat !== "ALL" && e.category !== expCat) return false;
+        if (expItemId !== "ALL" && String(e.id) !== expItemId) return false;
+        if (activity === "ACTIVE_ONLY" && e.actual <= 0) return false;
+        if (activity === "ZERO_ONLY" && e.actual > 0) return false;
+        if (keyword && !e.item.toLowerCase().includes(keyword) && !e.category.toLowerCase().includes(keyword)) return false;
+        return true;
+      });
+      filteredExps = sortDescending(filteredExps, sortMode);
+
+      updateDashboard(filteredRevs, filteredExps);
+    }
+
+    // =========================================================================
+    // 4. UPDATE KPIS, CHARTS & TABLES
+    // =========================================================================
+    function formatTHB(num) {
+      const rounded = Math.round((num + Number.EPSILON) * 100) / 100;
+      const sign = rounded < 0 ? "-" : "";
+      return sign + "฿" + Math.abs(rounded).toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    function formatNum(num) {
+      const rounded = Math.round((num + Number.EPSILON) * 100) / 100;
+      return rounded.toLocaleString("th-TH", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+    }
+
+    function shortenLabel(str, maxLen = 28) {
+      const clean = str.replace(/^\d+\s+/, "");
+      return clean.length > maxLen ? clean.substring(0, maxLen) + "..." : clean;
+    }
+
+    function updateDashboard(revs, exps) {
+      // --- KPIs ---
+      const revBudget = revs.reduce((s, r) => s + r.budget, 0);
+      const revActual = revs.reduce((s, r) => s + r.actual, 0);
+      const expBudget = exps.reduce((s, e) => s + e.budget, 0);
+      const expActual = exps.reduce((s, e) => s + e.actual, 0);
+      const net = revActual - expActual;
+
+      const revPct = revBudget > 0 ? (revActual / revBudget) * 100 : 0;
+      const expPct = expBudget > 0 ? (expActual / expBudget) * 100 : 0;
+      const remExpPct = expBudget > 0 ? Math.max(0, 100 - expPct) : 0;
+
+      document.getElementById("kpiBudget").textContent = formatTHB(expBudget);
+      document.getElementById("kpiBudgetSub").textContent = `งบรับ (ที่กรอง): ${formatTHB(revBudget)} | งบจ่าย (ที่กรอง): ${formatTHB(expBudget)}`;
+
+      document.getElementById("kpiActualRev").textContent = formatTHB(revActual);
+      document.getElementById("kpiRevPct").textContent = `${revPct.toFixed(2)}%`;
+      document.getElementById("kpiRevBar").style.width = `${Math.min(100, revPct)}%`;
+
+      document.getElementById("kpiActualExp").textContent = formatTHB(expActual);
+      document.getElementById("kpiExpPct").textContent = `${expPct.toFixed(2)}%`;
+      document.getElementById("kpiExpBar").style.width = `${Math.min(100, expPct)}%`;
+
+      const netEl = document.getElementById("kpiNetBalance");
+      const netStatusEl = document.getElementById("kpiNetStatus");
+      const netIconBox = document.getElementById("kpiNetIconBox");
+      netEl.textContent = formatTHB(net);
+
+      if (net >= 0) {
+        netEl.className = "text-2xl font-bold text-emerald-600 mt-2";
+        netStatusEl.className = "px-2 py-0.5 rounded-md bg-emerald-50 text-emerald-700 font-medium";
+        netStatusEl.textContent = "รายรับสูงกว่ารายจ่าย (เกินดุล)";
+        netIconBox.className = "p-2.5 bg-emerald-50 text-emerald-600 rounded-xl";
+      } else {
+        netEl.className = "text-2xl font-bold text-amber-600 mt-2";
+        netStatusEl.className = "px-2 py-0.5 rounded-md bg-amber-50 text-amber-700 font-medium";
+        netStatusEl.textContent = "รายจ่ายสูงกว่ารายรับ";
+        netIconBox.className = "p-2.5 bg-amber-50 text-amber-600 rounded-xl";
+      }
+      document.getElementById("kpiRemainingBudget").textContent = `งบจ่ายคงเหลือ: ${remExpPct.toFixed(2)}%`;
+
+      // --- Chart 1: Revenue Donut ---
+      const activeRevs = [...revs].filter(r => r.actual > 0).sort((a, b) => b.actual - a.actual);
+      if (activeRevs.length > 0) {
+        charts.revDonut.data.labels = activeRevs.map(r => shortenLabel(r.item, 32));
+        charts.revDonut.data.datasets[0].data = activeRevs.map(r => r.actual);
+      } else {
+        charts.revDonut.data.labels = ["ยังไม่มีรายรับจริงในกลุ่มที่เลือก"];
+        charts.revDonut.data.datasets[0].data = [0];
+      }
+      charts.revDonut.update();
+
+      // --- Chart 2: Revenue Bar ---
+      const nonEmptyRevs = [...revs].filter(r => r.budget > 0 || r.actual > 0).sort((a, b) => b.budget - a.budget);
+      charts.revBar.data.labels = nonEmptyRevs.map(r => shortenLabel(r.item, 24));
+      charts.revBar.data.datasets[0].data = nonEmptyRevs.map(r => r.budget);
+      charts.revBar.data.datasets[1].data = nonEmptyRevs.map(r => r.actual);
+      charts.revBar.update();
+
+      // --- Chart 3: Expense Category Donut ---
+      const catMap = {};
+      const useActualForCat = expActual > 0;
+      exps.forEach(e => {
+        const val = useActualForCat ? e.actual : e.budget;
+        catMap[e.category] = (catMap[e.category] || 0) + val;
+      });
+      const catLabels = Object.keys(catMap).filter(k => catMap[k] > 0).sort((a, b) => catMap[b] - catMap[a]);
+      charts.expCatDonut.data.labels = catLabels.length ? catLabels : ["ไม่มีข้อมูล"];
+      charts.expCatDonut.data.datasets[0].data = catLabels.length ? catLabels.map(k => catMap[k]) : [0];
+      charts.expCatDonut.update();
+
+      // --- Chart 4: Top Expense Items ---
+      const sortedExps = [...exps]
+        .sort((a, b) => (b.actual - a.actual) || (b.budget - a.budget))
+        .slice(0, 8);
+      charts.expTopBar.data.labels = sortedExps.map(e => shortenLabel(e.item, 34));
+      charts.expTopBar.data.datasets[0].data = sortedExps.map(e => e.actual);
+      charts.expTopBar.data.datasets[1].data = sortedExps.map(e => e.budget);
+      charts.expTopBar.update();
+
+      // --- Tables (เรียงจากมากไปน้อยเรียบร้อยแล้ว) ---
+      renderTables(revs, exps);
+    }
+
+    function renderTables(revs, exps) {
+      document.getElementById("expCountBadge").textContent = exps.length;
+      document.getElementById("revCountBadge").textContent = revs.length;
+
+      const expBody = document.getElementById("expenseTableBody");
+      expBody.innerHTML = exps.length === 0
+        ? `<tr><td colspan="6" class="py-8 text-center text-slate-400">ไม่พบรายการรายจ่ายตามเงื่อนไขที่กรอง</td></tr>`
+        : exps.map(e => {
+            const rem = e.budget - e.actual;
+            const pct = e.budget > 0 ? ((e.actual / e.budget) * 100).toFixed(2) : "0.00";
+            const badgeClass = e.actual > 0
+              ? "bg-rose-50 text-rose-600 font-semibold"
+              : "bg-slate-100 text-slate-500";
+            return `
+              <tr class="hover:bg-slate-50/80 transition">
+                <td class="py-3 px-6 font-medium text-slate-700">${e.item}</td>
+                <td class="py-3 px-4 text-xs text-slate-500 whitespace-nowrap">${e.category}</td>
+                <td class="py-3 px-4 text-right font-medium text-slate-700">${formatNum(e.budget)}</td>
+                <td class="py-3 px-4 text-right font-semibold ${e.actual > 0 ? 'text-rose-600' : 'text-slate-400'}">${formatNum(e.actual)}</td>
+                <td class="py-3 px-4 text-right text-slate-600">${formatNum(rem)}</td>
+                <td class="py-3 px-6 text-right">
+                  <span class="px-2.5 py-1 rounded-full text-xs ${badgeClass}">${pct}%</span>
+                </td>
+              </tr>
+            `;
+          }).join("");
+
+      const revBody = document.getElementById("revenueTableBody");
+      revBody.innerHTML = revs.length === 0
+        ? `<tr><td colspan="5" class="py-8 text-center text-slate-400">ไม่พบรายการรายรับตามเงื่อนไขที่กรอง</td></tr>`
+        : revs.map(r => {
+            const rem = r.budget - r.actual;
+            const pct = r.budget > 0 ? ((r.actual / r.budget) * 100).toFixed(2) : "0.00";
+            const badgeClass = r.actual > 0
+              ? "bg-emerald-50 text-emerald-600 font-semibold"
+              : "bg-slate-100 text-slate-500";
+            return `
+              <tr class="hover:bg-slate-50/80 transition">
+                <td class="py-3 px-6 font-medium text-slate-700">${r.item}</td>
+                <td class="py-3 px-4 text-right font-medium text-slate-700">${formatNum(r.budget)}</td>
+                <td class="py-3 px-4 text-right font-semibold ${r.actual > 0 ? 'text-emerald-600' : 'text-slate-400'}">${formatNum(r.actual)}</td>
+                <td class="py-3 px-4 text-right text-slate-600">${formatNum(rem)}</td>
+                <td class="py-3 px-6 text-right">
+                  <span class="px-2.5 py-1 rounded-full text-xs ${badgeClass}">${pct}%</span>
+                </td>
+              </tr>
+            `;
+          }).join("");
+    }
+
+    function switchTab(tab) {
+      const expBtn = document.getElementById("tabExpBtn");
+      const revBtn = document.getElementById("tabRevBtn");
+      const expCont = document.getElementById("expenseTableContainer");
+      const revCont = document.getElementById("revenueTableContainer");
+
+      if (tab === "expense") {
+        expBtn.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white text-indigo-600 shadow-sm transition";
+        revBtn.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 transition";
+        expCont.classList.remove("hidden");
+        revCont.classList.add("hidden");
+      } else {
+        revBtn.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-semibold bg-white text-indigo-600 shadow-sm transition";
+        expBtn.className = "px-4 py-2 rounded-lg text-xs sm:text-sm font-medium text-slate-600 hover:text-slate-900 transition";
+        revCont.classList.remove("hidden");
+        expCont.classList.add("hidden");
+      }
+    }
+
+    // =========================================================================
+    // 5. DYNAMIC EXCEL FILE PARSER (อัปเดตอัตโนมัติเมื่อเลือกไฟล์ Excel ใหม่)
+    // =========================================================================
+    document.getElementById("excelUpload").addEventListener("change", function (evt) {
+      const file = evt.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function (e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: "array" });
+
+          // 1) อ่านชีต "รับ-จ่าย" เพื่อดึงหัวรายงานและหมายเหตุ
+          if (workbook.Sheets["รับ-จ่าย"]) {
+            const summaryRows = XLSX.utils.sheet_to_json(workbook.Sheets["รับ-จ่าย"], { header: 1 });
+            if (summaryRows[0] && summaryRows[0][0]) appState.meta.org = String(summaryRows[0][0]).trim();
+            if (summaryRows[1] && summaryRows[1][0]) appState.meta.fiscalYear = String(summaryRows[1][0]).trim();
+            if (summaryRows[2] && summaryRows[2][0]) appState.meta.period = String(summaryRows[2][0]).trim();
+
+            const noteIdx = summaryRows.findIndex(r => r[0] && String(r[0]).includes("หมายเหตุ"));
+            if (noteIdx !== -1) {
+              const notes = summaryRows.slice(noteIdx + 1)
+                .map(r => (r[0] ? String(r[0]).replace(/\*\*/g, "").trim() : ""))
+                .filter(Boolean)
+                .join(" ");
+              if (notes) appState.meta.note = notes;
+            }
+          }
+
+          // 2) อ่านชีต "รายรับ" (รองรับจำนวนแถวที่เพิ่มขึ้นแบบ Dynamic)
+          if (workbook.Sheets["รายรับ"]) {
+            const revRows = XLSX.utils.sheet_to_json(workbook.Sheets["รายรับ"], { header: 1 });
+            const parsedRevs = [];
+            for (let i = 6; i < revRows.length; i++) {
+              const row = revRows[i];
+              if (!row || !row[0]) continue;
+              const label = String(row[0]).trim();
+              if (label === "เงินรายได้" || label.includes("รายการข้อมูล")) continue;
+              const budget = parseFloat(row[1]) || 0;
+              const actual = parseFloat(row[2]) || 0;
+              parsedRevs.push({ item: label, budget, actual });
+            }
+            if (parsedRevs.length > 0) appState.revenues = parsedRevs;
+          }
+
+          // 3) อ่านชีต "รายจ่าย" (รองรับจำนวนแถวที่เพิ่มขึ้นแบบ Dynamic)
+          if (workbook.Sheets["รายจ่าย"]) {
+            const expRows = XLSX.utils.sheet_to_json(workbook.Sheets["รายจ่าย"], { header: 1 });
+            const parsedExps = [];
+            for (let i = 6; i < expRows.length; i++) {
+              const row = expRows[i];
+              if (!row || !row[0]) continue;
+              const label = String(row[0]).trim();
+              if (label === "เงินรายได้" || label.includes("รายการข้อมูล")) continue;
+              const budget = parseFloat(row[1]) || 0;
+              const actual = parseFloat(row[2]) || 0;
+              parsedExps.push({ item: label, budget, actual });
+            }
+            if (parsedExps.length > 0) appState.expenses = parsedExps;
+          }
+
+          // อัปเดต UI ทั้งหมด
+          document.getElementById("reportPeriodBadge").textContent = appState.meta.period;
+          document.getElementById("reportSubtitle").textContent = `${appState.meta.org} • ${appState.meta.fiscalYear}`;
+          document.getElementById("noteContent").textContent = appState.meta.note;
+          document.getElementById("fileStatusText").textContent = `แหล่งข้อมูล: ${file.name} (อัปเดตล่าสุดเมื่อสักครู่)`;
+
+          enrichExpenses();
+          populateFilterDropdowns();
+          resetFilters();
+        } catch (err) {
+          alert("เกิดข้อผิดพลาดในการอ่านไฟล์ Excel กรุณาตรวจสอบว่ามีชีต 'รายรับ' และ 'รายจ่าย' อยู่ในไฟล์");
+          console.error(err);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    });
+
+    // Boot Application
+    window.addEventListener("DOMContentLoaded", () => {
+      enrichExpenses();
+      initCharts();
+      populateFilterDropdowns();
+      applyFilters();
+    });
+  </script>
+</body>
+</html>
